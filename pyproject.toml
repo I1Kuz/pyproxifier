@@ -4,23 +4,81 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyproxifier"
-version = "0.1.0"
-description = "A Python library for programmatic Proxifier management and automation."
+version = "1.0.0"
+description = "A comprehensive Python library for programmatic Proxifier management and automation."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "I1Kuz", email = "i1marqueeit@gmail.com" }
 ]
+keywords = ["proxifier", "proxy", "socks5", "routing", "automation", "vpn", "windows"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Networking",
+    "Topic :: System :: Systems Administration",
+]
 dependencies = [
     "psutil>=5.9.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/I1Kuz/pyproxifier"
+Documentation = "https://github.com/I1Kuz/pyproxifier#readme"
+Repository = "https://github.com/I1Kuz/pyproxifier.git"
+Issues = "https://github.com/I1Kuz/pyproxifier/issues"
+Changelog = "https://github.com/I1Kuz/pyproxifier/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "basedpyright>=1.20.0",
+    "import-linter>=2.16; python_version >= '3.11'",
+    "coverage>=7.16.2",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["pyproxifier*"]
+
+[tool.setuptools.package-data]
+pyproxifier = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.basedpyright]
+include = ["pyproxifier", "tests", "examples"]
+exclude = [
+    "**/__pycache__",
+    ".pytest_cache",
+    "build",
+    "dist",
+    "ip_service.py",
+    "dialog_handler.py",
+    "tld_map.py",
+]
+pythonVersion = "3.10"
+pythonPlatform = "Windows"
+typeCheckingMode = "strict"
+reportUnusedCallResult = false
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "basedpyright>=1.20.0",
+    "import-linter>=2.16; python_version >= '3.11'",
+    "coverage>=7.16.2",
+    "pytest-cov>=7.1.0",
+]

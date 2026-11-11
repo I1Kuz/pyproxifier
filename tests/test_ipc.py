@@ -282,14 +282,19 @@ def test_named_pipe_transact() -> None:
 
 def test_named_pipe_send_profile_bytes() -> None:
     client = NamedPipeClient()
-    with patch.object(client, "send", return_value=12) as mock_send:
+    with (
+        patch.object(client, "connect") as mock_connect,
+        patch.object(client, "send", return_value=12) as mock_send,
+    ):
         n = client.send_profile(b"<ProxifierProfile/>")
         assert n == 12
+        mock_connect.assert_called_once()
         mock_send.assert_called_once_with(b"<ProxifierProfile/>")
 
 
 def test_named_pipe_send_profile_str() -> None:
     client = NamedPipeClient()
+    client._handle = 1234  # pyright: ignore[reportPrivateUsage]
     with patch.object(client, "send", return_value=19) as mock_send:
         n = client.send_profile("<ProxifierProfile/>")
         assert n == 19

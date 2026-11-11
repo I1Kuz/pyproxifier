@@ -20,7 +20,7 @@ def test_facade_initialization_and_operations() -> None:
 
         # 2. Initialize when file already exists (loads existing)
         prox_existing = Proxifier(profile_path=profile_path)
-        assert prox_existing.profile_path == profile_path
+        assert prox_existing.profile_path.resolve() == profile_path.resolve()
 
         # 3. Initialize with create_if_missing=False on non-existent path
         missing_path = Path(tmpdir) / "nonexistent.ppx"
@@ -169,7 +169,12 @@ def test_facade_checker_methods() -> None:
             prox.check_proxy(99999, timeout=0.1)
 
         # launch_proxy_checker with proxy item
-        with mock.patch("subprocess.Popen") as mock_popen:
+        fake_exe = Path(r"C:\fake\ProxyChecker.exe")
+        with (
+            mock.patch("pyproxifier.process.ProcessController.find_tool_binary", return_value=fake_exe),
+            mock.patch.object(Path, "is_file", return_value=True),
+            mock.patch("subprocess.Popen") as mock_popen,
+        ):
             mock_popen.return_value = mock.MagicMock()
             res_launch = prox.launch_proxy_checker(p)
             assert res_launch is True

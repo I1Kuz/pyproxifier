@@ -2,32 +2,30 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| Version | Supported |
+| ------- | --------- |
+| 1.0.x   | Yes       |
 
 ---
 
 ## Reporting a Vulnerability
 
-The `pyproxifier` project takes the security of its native IPC mechanisms and Windows system integrations seriously.
+The `pyproxifier` project implements low-level Windows networking and inter-process communication mechanisms. Security issues are treated with high priority.
 
-If you believe you have discovered a security vulnerability regarding:
+If you discover a potential vulnerability regarding:
 - Windows Filtering Platform (WFP) kernel driver communication
-- Named Pipe or TCP Control Socket permissions / access controls
-- Windows Registry privilege handling
-- Buffer management or protocol parsing
+- Named Pipe or TCP Control Socket access controls
+- Windows Registry credential and license handling
+- Buffer safety or wire protocol framing
 
-**Please do NOT disclose it in a public GitHub issue.**
+Please do not report vulnerabilities through public issue trackers.
 
-Instead, please report it via private email or GitHub Private Vulnerability Reporting:
-- **Email**: security@pyproxifier.dev (or contact repository maintainers directly)
-- **GitHub Security Advisories**: Use the "Report a vulnerability" button on the GitHub repository Security tab.
+Send vulnerability details directly to:
+- **Email**: i1marqueeit@gmail.com
+- **GitHub Security Advisories**: Via the repository's Security tab.
 
-### What to include in your report:
-- A clear description of the vulnerability and its potential impact.
-- Steps or a minimal script to reproduce the behavior.
-- Affected Windows version and Proxifier version.
-
-We strive to acknowledge receipt within 48 hours and provide a fix or workaround in an expedited manner.
-
+### Required Report Details:
+- Detailed technical description of the vulnerability and attack vector.
+- Minimal reproducible proof of concept.
+- Affected Windows operating system versions and architecture (x86/x64).
+- Relevant Proxifier application versions.

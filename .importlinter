@@ -1,0 +1,61 @@
+[importlinter]
+root_package = pyproxifier
+
+[importlinter:contract:layers]
+name = Layered Architecture
+type = layers
+layers =
+    pyproxifier.client
+    pyproxifier.managers
+    pyproxifier.system
+    pyproxifier.socket_client
+    pyproxifier.ipc
+    pyproxifier.checker
+    pyproxifier.version
+    pyproxifier.process
+    pyproxifier.validator
+    pyproxifier.parser
+    pyproxifier.models
+    pyproxifier.constants
+    pyproxifier.exceptions
+
+[importlinter:contract:models-isolation]
+name = Models must not import higher layers
+type = forbidden
+source_modules =
+    pyproxifier.models
+    pyproxifier.exceptions
+    pyproxifier.constants
+forbidden_modules =
+    pyproxifier.parser
+    pyproxifier.validator
+    pyproxifier.process
+    pyproxifier.checker
+    pyproxifier.ipc
+    pyproxifier.socket_client
+    pyproxifier.system
+    pyproxifier.managers
+    pyproxifier.client
+
+[importlinter:contract:parsers-isolation]
+name = Parsers and validators must not import infrastructure or managers
+type = forbidden
+source_modules =
+    pyproxifier.parser
+    pyproxifier.validator
+forbidden_modules =
+    pyproxifier.process
+    pyproxifier.checker
+    pyproxifier.ipc
+    pyproxifier.socket_client
+    pyproxifier.system
+    pyproxifier.managers
+    pyproxifier.client
+
+[importlinter:contract:managers-isolation]
+name = Managers must not import client facade
+type = forbidden
+source_modules =
+    pyproxifier.managers
+forbidden_modules =
+    pyproxifier.client

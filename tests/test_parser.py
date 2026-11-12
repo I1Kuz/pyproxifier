@@ -242,3 +242,199 @@ def test_parser_helper_functions_and_edge_attributes() -> None:
     assert prof.chains[0].redundancy_timeout_sec is None
     assert prof.rules[0].action_type == "CustomActionType"
     assert prof.rules[0].target_id is None
+
+
+def test_round_trip_unknown_elements_and_attributes() -> None:
+    """Tests the reviewer's exact experiment:
+
+    1. Unknown root attribute 'custom_attr'
+    2. Unknown option element '<FutureOption>'
+    3. Unknown top-level section '<FutureSection>'
+    4. Unknown attributes and subelements in Proxy, Chain, and Rule
+    """
+    input_xml = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ProxifierProfile version="102" platform="Windows" product_id="0" product_minver="400" custom_attr="reviewer_val">
+	<Options custom_opt="true">
+		<Resolve custom_dns_attr="dns_val">
+			<AutoModeDetection enabled="false" />
+			<ViaProxy enabled="true" />
+			<BlockNonATypes enabled="true" />
+			<ExclusionList OnlyFromListMode="false" extra_list_attr="123">%ComputerName%; localhost</ExclusionList>
+			<DnsUdpMode>0</DnsUdpMode>
+			<FutureDnsOption>dns_deep_setting</FutureDnsOption>
+		</Resolve>
+		<Encryption mode="disabled" custom_enc="1" />
+		<ConnectionLoopDetection enabled="true" resolve="true" />
+		<Udp mode="mode_block_all" />
+		<LeakPreventionMode enabled="true" />
+		<ProcessOtherUsers enabled="false" />
+		<ProcessServices enabled="false" />
+		<HandleDirectConnections enabled="false" />
+		<HttpProxiesSupport enabled="false" />
+		<FutureOption>future_option_value</FutureOption>
+	</Options>
+	<ProxyList extra_proxy_list="true">
+		<Proxy id="100" type="SOCKS5" custom_proxy_attr="p_val">
+			<Label>Primary</Label>
+			<Authentication enabled="true" auth_attr="auth_val">
+				<Username>myuser</Username>
+				<Password>  padded_secret_pass  </Password>
+				<FutureAuthOption>domain_setting</FutureAuthOption>
+			</Authentication>
+			<Options>48</Options>
+			<Port>1080</Port>
+			<Address>127.0.0.1</Address>
+			<FutureProxyOption>speed_limit_50</FutureProxyOption>
+		</Proxy>
+	</ProxyList>
+	<ChainList>
+		<Chain id="1" type="simple" custom_chain_attr="c_val">
+			<Name>SimpleChain</Name>
+			<Proxy id="100" />
+			<FutureChainOption>chain_meta</FutureChainOption>
+		</Chain>
+	</ChainList>
+	<RuleList>
+		<Rule enabled="true" custom_rule_attr="r_val">
+			<Action type="Direct" custom_act_attr="act_val" />
+			<Name>Default</Name>
+			<FutureRuleOption>rule_meta</FutureRuleOption>
+		</Rule>
+	</RuleList>
+	<FutureSection section_id="section_99">
+		<FutureChild key="k1">v1</FutureChild>
+		<NestedGroup id="nested_1">
+			<DeepChild>deep_value</DeepChild>
+		</NestedGroup>
+	</FutureSection>
+</ProxifierProfile>"""
+
+    profile = ProfileParser.from_xml(input_xml)
+
+    # 1. Verify unknown root attribute
+    assert profile.extra_attributes.get("custom_attr") == "reviewer_val"
+
+    # 2. Verify unknown option
+    assert profile.options.extra_attributes.get("custom_opt") == "true"
+    future_opt = next((el for el in profile.options.extra_elements if el.tag == "FutureOption"), None)
+    assert future_opt is not None
+    assert future_opt.text == "future_option_value"
+
+    # 3. Verify unknown DNS option and exclusion attribute
+    assert profile.options.dns.extra_attributes.get("custom_dns_attr") == "dns_val"
+    assert profile.options.dns.exclusion_list_extra_attributes.get("extra_list_attr") == "123"
+    future_dns = next((el for el in profile.options.dns.extra_elements if el.tag == "FutureDnsOption"), None)
+    assert future_dns is not None
+    assert future_dns.text == "dns_deep_setting"
+
+    # 4. Verify password with whitespace is preserved!
+    p = profile.proxies[0]
+    assert p.password == "  padded_secret_pass  "
+    assert p.extra_attributes.get("custom_proxy_attr") == "p_val"
+    assert p.auth_extra_attributes.get("auth_attr") == "auth_val"
+    assert any(el.tag == "FutureAuthOption" and el.text == "domain_setting" for el in p.auth_extra_elements)
+    assert any(el.tag == "FutureProxyOption" and el.text == "speed_limit_50" for el in p.extra_elements)
+
+    # 5. Verify chain and rule unknown fields
+    c = profile.chains[0]
+    assert c.extra_attributes.get("custom_chain_attr") == "c_val"
+    assert any(el.tag == "FutureChainOption" and el.text == "chain_meta" for el in c.extra_elements)
+
+    r = profile.rules[0]
+    assert r.extra_attributes.get("custom_rule_attr") == "r_val"
+    assert r.action_extra_attributes.get("custom_act_attr") == "act_val"
+    assert any(el.tag == "FutureRuleOption" and el.text == "rule_meta" for el in r.extra_elements)
+
+    # 6. Verify top-level <FutureSection> with nested hierarchy
+    assert len(profile.extra_elements) == 1
+    future_sec = profile.extra_elements[0]
+    assert future_sec.tag == "FutureSection"
+    assert future_sec.attributes.get("section_id") == "section_99"
+    assert len(future_sec.children) == 2
+    assert future_sec.children[0].tag == "FutureChild"
+    assert future_sec.children[0].text == "v1"
+    assert future_sec.children[1].tag == "NestedGroup"
+    assert future_sec.children[1].children[0].tag == "DeepChild"
+    assert future_sec.children[1].children[0].text == "deep_value"
+
+    # 7. Serialize back to XML and re-parse: 100% round-trip fidelity
+    xml_out = ProfileParser.to_xml(profile)
+    assert 'custom_attr="reviewer_val"' in xml_out
+    assert "<FutureOption>future_option_value</FutureOption>" in xml_out
+    assert "<FutureSection" in xml_out
+    assert "deep_value" in xml_out
+    assert "  padded_secret_pass  " in xml_out
+
+    reloaded = ProfileParser.from_xml(xml_out)
+    assert reloaded.extra_attributes.get("custom_attr") == "reviewer_val"
+    assert reloaded.options.extra_attributes.get("custom_opt") == "true"
+    assert reloaded.proxies[0].password == "  padded_secret_pass  "
+    assert reloaded.proxies[0].extra_attributes.get("custom_proxy_attr") == "p_val"
+    assert len(reloaded.extra_elements) == 1
+    assert reloaded.extra_elements[0].children[1].children[0].text == "deep_value"
+
+
+def test_password_whitespace_and_empty_handling() -> None:
+    # 1. Empty password
+    xml_empty_pass = """<?xml version="1.0" encoding="UTF-8"?>
+<ProxifierProfile version="102">
+    <ProxyList>
+        <Proxy id="100" type="SOCKS5">
+            <Address>127.0.0.1</Address>
+            <Authentication enabled="true">
+                <Username>user</Username>
+                <Password></Password>
+            </Authentication>
+        </Proxy>
+    </ProxyList>
+</ProxifierProfile>"""
+    prof = ProfileParser.from_xml(xml_empty_pass)
+    assert prof.proxies[0].password == ""
+
+    # 2. No password element
+    xml_no_pass = """<?xml version="1.0" encoding="UTF-8"?>
+<ProxifierProfile version="102">
+    <ProxyList>
+        <Proxy id="100" type="SOCKS5">
+            <Address>127.0.0.1</Address>
+            <Authentication enabled="true">
+                <Username>user</Username>
+            </Authentication>
+        </Proxy>
+    </ProxyList>
+</ProxifierProfile>"""
+    prof2 = ProfileParser.from_xml(xml_no_pass)
+    assert prof2.proxies[0].password is None
+
+
+def test_xml_element_string_helpers() -> None:
+    from pyproxifier.models.xml_element import XMLElement
+
+    raw = '<CustomNode id="42"><Sub>text</Sub></CustomNode>'
+    node = XMLElement.from_xml_string(raw)
+    assert node.tag == "CustomNode"
+    assert node.attributes == {"id": "42"}
+    assert len(node.children) == 1
+    assert node.children[0].tag == "Sub"
+    assert node.children[0].text == "text"
+
+    out = node.to_xml_string()
+    assert '<CustomNode id="42">' in out
+    assert "<Sub>text</Sub>" in out
+
+
+def test_extra_elements_accepts_raw_etree_element() -> None:
+    profile = ProxifierProfile.create_default()
+    raw_node = ET.Element("RawCustom", {"attrib1": "val1"})
+    raw_node.text = "raw_content"
+    profile.extra_elements.append(raw_node)  # pyright: ignore[reportArgumentType]
+
+    xml_out = ProfileParser.to_xml(profile)
+    assert '<RawCustom attrib1="val1">raw_content</RawCustom>' in xml_out
+
+
+def test_to_etree_elem_invalid_type_raises() -> None:
+    profile = ProxifierProfile.create_default()
+    profile.extra_elements.append(12345)  # pyright: ignore[reportArgumentType]
+    with pytest.raises(TypeError, match="Expected XMLElement"):
+        ProfileParser.to_xml(profile)

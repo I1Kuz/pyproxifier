@@ -10,6 +10,7 @@ from pyproxifier.models.options import (
 from pyproxifier.models.profile import ProxifierProfile
 from pyproxifier.models.proxy import ProxyItem, ProxyProtocol
 from pyproxifier.models.rule import ActionType, RuleItem
+from pyproxifier.models.xml_element import XMLElement
 
 __all__ = [
     "ActionType",
@@ -23,4 +24,5 @@ __all__ = [
     "ProxyProtocol",
     "RuleItem",
     "UdpMode",
+    "XMLElement",
 ]

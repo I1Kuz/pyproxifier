@@ -1,7 +1,13 @@
 """Data models for Proxifier profile global options and settings."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyproxifier.models.xml_element import XMLElement
 
 
 class UdpMode(str, Enum):
@@ -46,6 +52,9 @@ class DnsOptions:
     exclusion_list: str = "%ComputerName%; localhost; *.local; dns.msftncsi.com"
     exclusion_only_from_list: bool = False
     dns_udp_mode: int = 0
+    extra_attributes: dict[str, str] = field(default_factory=dict)
+    extra_elements: list[XMLElement] = field(default_factory=list)
+    exclusion_list_extra_attributes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -75,6 +84,11 @@ class ProfileOptions:
     process_services: bool = False
     handle_direct_connections: bool = False
     http_proxies_support: bool = False
+    extra_attributes: dict[str, str] = field(default_factory=dict)
+    extra_elements: list[XMLElement] = field(default_factory=list)
+    encryption_extra_attributes: dict[str, str] = field(default_factory=dict)
+    udp_extra_attributes: dict[str, str] = field(default_factory=dict)
+    connection_loop_extra_attributes: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.encryption_mode, EncryptionMode):

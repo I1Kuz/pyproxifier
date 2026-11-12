@@ -1,7 +1,13 @@
 """Data models for Proxifier routing rules."""
 
-from dataclasses import dataclass
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyproxifier.models.xml_element import XMLElement
 
 
 class ActionType(str, Enum):
@@ -45,6 +51,9 @@ class RuleItem:
     applications: str | None = None
     targets: str | None = None
     ports: str | None = None
+    extra_attributes: dict[str, str] = field(default_factory=dict)
+    extra_elements: list[XMLElement] = field(default_factory=list)
+    action_extra_attributes: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.action_type, ActionType):

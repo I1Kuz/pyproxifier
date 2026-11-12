@@ -11,6 +11,7 @@ from pyproxifier.models.chain import ChainItem
 from pyproxifier.models.options import ProfileOptions
 from pyproxifier.models.proxy import ProxyItem
 from pyproxifier.models.rule import ActionType, RuleItem
+from pyproxifier.models.xml_element import XMLElement
 
 
 @dataclass
@@ -28,6 +29,11 @@ class ProxifierProfile:
     proxies: list[ProxyItem] = field(default_factory=list)
     chains: list[ChainItem] = field(default_factory=list)
     rules: list[RuleItem] = field(default_factory=list)
+    extra_attributes: dict[str, str] = field(default_factory=dict)
+    extra_elements: list[XMLElement] = field(default_factory=list)
+    proxy_list_extra_attributes: dict[str, str] = field(default_factory=dict)
+    chain_list_extra_attributes: dict[str, str] = field(default_factory=dict)
+    rule_list_extra_attributes: dict[str, str] = field(default_factory=dict)
 
     def find_proxy(self, identifier: int | str) -> ProxyItem | None:
         """Finds a proxy by integer ID, string ID, or label."""

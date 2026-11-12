@@ -1,7 +1,13 @@
 """Data models for Proxifier proxy chains."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pyproxifier.models.xml_element import XMLElement
 
 
 class ChainType(str, Enum):
@@ -42,6 +48,8 @@ class ChainItem:
     redundancy_recheck_sec: int | None = None
     redundancy_try_direct: bool = False
     load_balance_same_pid: bool = False
+    extra_attributes: dict[str, str] = field(default_factory=dict)
+    extra_elements: list[XMLElement] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not isinstance(self.chain_type, ChainType):

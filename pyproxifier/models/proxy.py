@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
 from urllib.parse import quote, unquote, urlsplit
+
+if TYPE_CHECKING:
+    from pyproxifier.models.xml_element import XMLElement
 
 
 class ProxyProtocol(str, Enum):
@@ -49,6 +53,10 @@ class ProxyItem:
     options: int = 48
     label: str | None = None
     auth_enabled: bool | None = None
+    extra_attributes: dict[str, str] = field(default_factory=dict)
+    extra_elements: list[XMLElement] = field(default_factory=list)
+    auth_extra_attributes: dict[str, str] = field(default_factory=dict)
+    auth_extra_elements: list[XMLElement] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not isinstance(self.protocol_type, ProxyProtocol):

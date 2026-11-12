@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Type Checking: Strict](https://img.shields.io/badge/types-basedpyright%20strict-blueviolet)](https://github.com/DetachHead/basedpyright)
 [![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/I1Kuz/pyproxifier)
+[![Donate](https://img.shields.io/badge/Donate-Buy%20Me%20A%20Coffee-ffdd00.svg)](https://buymeacoffee.com/i1marqueeih)
 
 Python library for programmatic configuration, automation, and real-time IPC control of Proxifier on Windows (v3 and v4).
 
@@ -285,6 +286,17 @@ uv run lint-imports
 - [Contributing Guide](CONTRIBUTING.md): Environment setup and pull request requirements.
 - [Changelog](CHANGELOG.md): Version release history and migration notes.
 - [Security Policy](SECURITY.md): Vulnerability reporting procedures.
+
+---
+
+## Support & Donations
+
+If this project is helpful for your automation pipelines or research, you can support development:
+
+- **Buy Me a Coffee**: [buymeacoffee.com/i1marqueeih](https://buymeacoffee.com/i1marqueeih)
+- **EVM (ETH / USDT / USDC)**: `0x95e4b18bf2c95b88E1167e050c44584C1bAb78F7`  
+  *(Supported networks: Ethereum, BNB Smart Chain, Polygon, Arbitrum, Optimism, Base)*
+- **TRON (USDT TRC-20)**: `THu6Lk3ifBdYukycWSs9K6Zk6ow1aL4dhr`
 
 ---
 

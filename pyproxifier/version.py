@@ -3,7 +3,7 @@
 from pathlib import Path
 from pyproxifier.process import ProcessController
 
-__version__ = "1.0.0"
+__version__ = "0.0.2"
 
 
 def get_installed_proxifier_version() -> int | None:

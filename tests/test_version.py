@@ -9,7 +9,7 @@ from pyproxifier.version import __version__, get_installed_proxifier_version
 
 
 def test_version_string() -> None:
-    assert __version__ == "1.0.0"
+    assert __version__ == "0.0.2"
 
 
 def test_version_detection_scenarios() -> None:

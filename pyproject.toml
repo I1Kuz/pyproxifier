@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyproxifier"
-version = "1.0.0"
+version = "0.0.2"
 description = "A comprehensive Python library for programmatic Proxifier management and automation."
 readme = "README.md"
 requires-python = ">=3.10"

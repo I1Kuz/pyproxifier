@@ -7,7 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - 2026-11-11
+## [0.0.2] - 2026-11-12
+
+### Added
+- **Complete XML Round-Trip Preservation Engine (`XMLElement`)**:
+  - Introduced `XMLElement` recursive dataclass preserving unmodeled XML tags, attributes, text content, and arbitrary nested hierarchies.
+  - Added `extra_attributes` and `extra_elements` extension hooks to `ProxifierProfile`, `ProfileOptions`, `DnsOptions`, `ProxyItem`, `ChainItem`, and `RuleItem`.
+  - Added support for future XML sections, custom profile elements, and vendor extensions without data degradation during parse/serialize cycles.
+- **Atomic File Persistence & Backup Protection**:
+  - Re-engineered `ConfigManager.save()` with atomic file-replacement semantics (`.tmp` staging file -> `flush()` -> `os.fsync()` -> `os.replace()`), preventing profile corruption during sudden terminations.
+  - Added pre-write XML syntax verification via `ET.fromstring()` before any filesystem modifications.
+  - Added `backup=True` parameter to `save()` creating `.ppx.bak` snapshots prior to overwriting existing configurations.
+- **Fine-Grained IPC Delivery Diagnostics**:
+  - Introduced `ApplyStatus` enum (`SOCKET_CONFIRMED`, `PIPE_DISPATCHED`, `PROCESS_SPAWNED`, `COMMAND_DELIVERED`, `FAILED`) and `ApplyResult` dataclass with boolean coercion support.
+  - Added `Proxifier.apply_detailed()` and `IPCManager.apply_profile_detailed()` for programmatic distinction between command dispatch, process launch, and socket confirmation.
+  - Added `ProcessController.load_profile()` returning structured `ProcessExecutionResult` with explicit exit code diagnostics.
+- **Cross-Platform Test Execution**:
+  - Added cross-platform mock for Windows `ctypes.windll` in `tests/conftest.py`, enabling test execution on Linux/macOS CI runners.
+
+### Changed
+- Refactored `ProcessController.silent_load()` to build on `ProcessController.load_profile()`, hardening exit code detection against premature timeouts.
+- Bumped test suite coverage to 100% statement coverage across all 31 modules (2,653 statements, 0 misses).
+
+### Fixed
+- **API Options Handling**: Fixed `Proxifier.apply()` and `IPCManager.apply_profile()` to properly respect `use_socket=False` (bypassing TCP control socket completely) and `silent=False` (omitting `silent-load` CLI argument).
+- **Credential Whitespace Truncation**: Fixed `_get_elem_text(strip=False)` in `ProfileParser` for `Password` fields, preventing truncation of leading/trailing whitespace and supporting empty password strings.
+- **Cross-Platform Path Resolution**: Fixed path separator concatenation in `test_find_tool_binary` to support non-Windows filesystem paths.
+
+## [0.0.1] - 2026-11-11
 
 ### Added
 - **Core Domain & Parser**:

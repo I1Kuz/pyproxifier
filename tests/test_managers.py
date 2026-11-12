@@ -8,6 +8,7 @@ import pytest
 from pyproxifier.exceptions import (
     ChainNotFoundError,
     ProfileNotFoundError,
+    ProfileParseError,
     ProxyNotFoundError,
     RuleNotFoundError,
     ValidationError,
@@ -151,6 +152,39 @@ def test_config_manager_save_load() -> None:
         loaded = ConfigManager.load(file_path)
         assert len(loaded.proxies) == 1
         assert loaded.proxies[0].address == "192.168.1.10"
+
+
+def test_config_manager_atomic_save_and_backup() -> None:
+    profile = ProxifierProfile.create_default()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        dest = Path(tmpdir) / "my_profile.ppx"
+        ConfigManager.save(dest, profile)
+        assert dest.is_file()
+        orig_content = dest.read_text(encoding="utf-8")
+
+        # 1. Test backup=True
+        profile.rules[0].name = "UpdatedLocalhost"
+        ConfigManager.save(dest, profile, backup=True)
+        bak_file = dest.with_suffix(".ppx.bak")
+        assert bak_file.is_file()
+        assert bak_file.read_text(encoding="utf-8") == orig_content
+
+        # 2. Test error recovery: if os.replace fails, original file remains intact
+        with mock.patch("os.replace", side_effect=OSError("Disk write error")):
+            with mock.patch.object(Path, "unlink", side_effect=OSError("Permission denied")):
+                with pytest.raises(OSError, match="Disk write error"):
+                    profile.rules[0].name = "CorruptedName"
+                    ConfigManager.save(dest, profile)
+
+        # File content must still be intact from before the failure
+        reloaded = ConfigManager.load(dest)
+        assert reloaded.rules[0].name == "UpdatedLocalhost"
+
+        # 3. Test malformed XML prevents writing
+        with mock.patch("pyproxifier.parser.ProfileParser.to_xml", return_value="<Incomplete"):
+            with pytest.raises(ProfileParseError, match="Generated XML is malformed"):
+                ConfigManager.save(dest, profile)
+        assert ConfigManager.load(dest).rules[0].name == "UpdatedLocalhost"
 
 
 def test_rule_manager_unbind_target() -> None:

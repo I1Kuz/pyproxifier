@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import shutil
+import uuid
+import xml.etree.ElementTree as ET
 
 from pyproxifier.constants import (
     DEFAULT_PROFILE_NAME,
@@ -15,7 +18,7 @@ from pyproxifier.constants import (
     PROXIFIER_V3_DIR_NAME,
     PROXIFIER_V4_DIR_NAME,
 )
-from pyproxifier.exceptions import ProfileNotFoundError
+from pyproxifier.exceptions import ProfileNotFoundError, ProfileParseError
 from pyproxifier.models.profile import ProxifierProfile
 from pyproxifier.parser import ProfileParser
 from pyproxifier.validator import Validator
@@ -103,25 +106,71 @@ class ConfigManager:
         path: Path | str,
         profile: ProxifierProfile,
         validate: bool = True,
+        backup: bool = False,
     ) -> Path:
-        """Saves a profile to a .ppx file.
+        """Saves a profile to a .ppx file using atomic write semantics.
+
+        Ensures full data integrity:
+        1. Validates profile (if validate=True).
+        2. Generates XML and verifies XML syntax before any file system write.
+        3. Optionally creates a .ppx.bak backup if backup=True and dest exists.
+        4. Writes atomically to a temp file in the destination directory and flushes to disk.
+        5. Atomically replaces the target file via os.replace().
+        6. Safely cleans up temporary file on failure, preserving original file intact.
 
         Args:
             path: Destination file path.
             profile: ProxifierProfile instance to save.
             validate: Whether to validate the profile before saving.
+            backup: If True and destination already exists, creates a .bak backup.
+
+        Returns:
+            Resolved Path of the saved file.
+
+        Raises:
+            ValidationError: If model validation fails.
+            ProfileParseError: If generated XML fails syntax or parse check.
+            OSError: On file system errors. Original file remains intact.
         """
         if validate:
             Validator.validate_profile(profile)
 
-        dest = Path(path)
+        dest = Path(path).resolve()
         if not dest.suffix:
             dest = dest.with_suffix(".ppx")
         dest.parent.mkdir(parents=True, exist_ok=True)
 
         xml_content = ProfileParser.to_xml(profile)
-        with open(dest, "w", encoding="utf-8") as f:
-            f.write(xml_content)
+
+        # Pre-verify XML syntax integrity before touching storage
+        try:
+            ET.fromstring(xml_content)
+        except ET.ParseError as e:
+            raise ProfileParseError(f"Generated XML is malformed: {e}") from e
+
+        # Optional backup of existing profile
+        if backup and dest.is_file():
+            bak_path = dest.with_suffix(".ppx.bak")
+            shutil.copy2(dest, bak_path)
+
+        # Atomic write pattern: temporary file in the same directory for atomic replace
+        tmp_name = f".{dest.name}.{uuid.uuid4().hex[:8]}.tmp"
+        tmp_path = dest.parent / tmp_name
+
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                f.write(xml_content)
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(tmp_path, dest)
+        except Exception:
+            if tmp_path.is_file():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
+            raise
 
         return dest
 

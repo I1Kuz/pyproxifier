@@ -18,6 +18,7 @@ from pyproxifier.ipc.driver import DriverIPC
 from pyproxifier.ipc.pipe import NamedPipeClient
 from pyproxifier.ipc.service import ServiceIPC
 from pyproxifier.ipc.socket import ControlSocketClient
+from pyproxifier.ipc.status import ApplyResult, ApplyStatus
 from pyproxifier.ipc.window import WindowIPC
 from pyproxifier.models.profile import ProxifierProfile
 from pyproxifier.parser import ProfileParser
@@ -37,6 +38,7 @@ class IPCManager:
     ) -> None:
         self.default_socket_port = default_socket_port
         self.executable = executable
+        self.last_apply_result: ApplyResult | None = None
         self.window = WindowIPC
         self.driver = DriverIPC
         self.pipe = NamedPipeClient
@@ -82,38 +84,75 @@ class IPCManager:
         self,
         profile: ProxifierProfile,
         socket_port: int | None = None,
+        use_socket: bool | None = None,
+        silent: bool = True,
         validate: bool = True,
     ) -> bool:
         """Applies a configuration profile to Proxifier exclusively via IPC.
 
-        Zero process restarting, zero manual profile pasting.
+        Returns True if profile was applied or dispatched, False otherwise.
+        For detailed status information, see apply_profile_detailed() or self.last_apply_result.
+        """
+        res = self.apply_profile_detailed(
+            profile=profile,
+            socket_port=socket_port,
+            use_socket=use_socket,
+            silent=silent,
+            validate=validate,
+        )
+        return res.applied
+
+    def apply_profile_detailed(
+        self,
+        profile: ProxifierProfile,
+        socket_port: int | None = None,
+        use_socket: bool | None = None,
+        silent: bool = True,
+        validate: bool = True,
+    ) -> ApplyResult:
+        """Applies a configuration profile and returns explicit ApplyResult status.
 
         Order of IPC mechanisms:
-        1. Native TCP Control Socket (in-memory hot-reload without touching disk).
-        2. If Proxifier is not running: launches in control-socket mode and connects immediately.
+        1. Native TCP Control Socket (in-memory hot-reload without touching disk) - if use_socket is not False.
+        2. If Proxifier is not running: launches in control-socket mode and connects - if use_socket is not False.
         3. If Proxifier is running and Named Pipe is ready: hot-reloads directly via \\\\.\\pipe\\proxifier.
-        4. Fallback: native silent-load IPC (which communicates directly with the running instance).
+        4. Fallback: native process execution IPC (communicates directly with running instance or launches GUI).
+
+        Respects use_socket: if False, completely disables Control Socket strategies.
+        Respects silent: if False, executes CLI loader without 'silent-load' parameter.
         """
         if validate:
             Validator.validate_profile(profile)
 
         port = socket_port or self.default_socket_port
 
-        # Strategy 1: Control Socket is already listening
-        if self.is_socket_ready(port=port):
+        # Strategy 1: Control Socket is already listening (if socket enabled)
+        if use_socket is not False and self.is_socket_ready(port=port):
             with self.get_socket_client(port=port) as client:
                 client.load_config(profile)
-            return True
+            result = ApplyResult(
+                applied=True,
+                status=ApplyStatus.SOCKET_CONFIRMED,
+                message="Profile applied and confirmed via active TCP Control Socket.",
+            )
+            self.last_apply_result = result
+            return result
 
         # Strategy 2: Proxifier is not running at all -> start directly in Control Socket mode
-        if not self.is_proxifier_running():
+        if use_socket is not False and not self.is_proxifier_running():
             client = ControlSocketClient.start_and_connect(
                 port=port,
                 executable=self.executable,
             )
             try:
                 client.load_config(profile)
-                return True
+                result = ApplyResult(
+                    applied=True,
+                    status=ApplyStatus.SOCKET_CONFIRMED,
+                    message="Proxifier started in Control Socket mode and profile applied.",
+                )
+                self.last_apply_result = result
+                return result
             finally:
                 client.disconnect()
 
@@ -123,18 +162,44 @@ class IPCManager:
                 pipe_client = self.pipe()
                 with pipe_client:
                     pipe_client.send_profile(profile)
-                return True
+                result = ApplyResult(
+                    applied=True,
+                    status=ApplyStatus.PIPE_DISPATCHED,
+                    message="Profile dispatched via Windows Named Pipe.",
+                )
+                self.last_apply_result = result
+                return result
             except Exception as e:
-                logger.debug("Named pipe profile delivery failed, falling back to silent-load: %s", e)
+                logger.debug("Named pipe profile delivery failed, falling back to process load: %s", e)
 
-        # Strategy 4: Fallback to native silent-load IPC (which communicates directly with the running instance)
+        # Strategy 4: Fallback to process execution IPC
+        was_running = self.is_proxifier_running()
         xml_str = ProfileParser.to_xml(profile)
         with tempfile.NamedTemporaryFile("w", suffix=".ppx", delete=False, encoding="utf-8") as f:
             f.write(xml_str)
             tmp_path = Path(f.name)
 
         try:
-            return ProcessController.silent_load(tmp_path, executable=self.executable)
+            ok = ProcessController.silent_load(
+                tmp_path,
+                executable=self.executable,
+                silent=silent,
+            )
+            if ok:
+                status = ApplyStatus.COMMAND_DELIVERED if was_running else ApplyStatus.PROCESS_SPAWNED
+                result = ApplyResult(
+                    applied=True,
+                    status=status,
+                    message="Profile dispatched to Proxifier process.",
+                )
+            else:
+                result = ApplyResult(
+                    applied=False,
+                    status=ApplyStatus.FAILED,
+                    message="Proxifier process loader returned failure.",
+                )
+            self.last_apply_result = result
+            return result
         finally:
             try:
                 tmp_path.unlink(missing_ok=True)

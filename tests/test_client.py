@@ -206,3 +206,32 @@ def test_facade_service_and_cli_methods() -> None:
         with mock.patch.object(prox.ipc, "register_license", return_value=True) as mock_reg:
             assert prox.register_license("KEY-12345") is True
             mock_reg.assert_called_once_with("KEY-12345")
+
+
+def test_apply_use_socket_false_and_detailed() -> None:
+    from pyproxifier.ipc.status import ApplyStatus
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        profile_path = Path(tmpdir) / "apply_opts_test.ppx"
+        prox = Proxifier(profile_path=profile_path)
+
+        # 1. When use_socket=False, is_socket_ready and socket connection must NOT be queried
+        with mock.patch.object(prox.ipc, "is_socket_ready") as mock_sock_ready:
+            with mock.patch.object(prox.ipc, "is_pipe_ready", return_value=False):
+                with mock.patch("pyproxifier.process.ProcessController.silent_load", return_value=True) as mock_sl:
+                    res = prox.apply(use_socket=False, silent=False)
+                    assert res is True
+                    mock_sock_ready.assert_not_called()
+                    mock_sl.assert_called_once()
+                    assert mock_sl.call_args[1]["silent"] is False
+
+        # 2. Test apply_detailed returns ApplyResult with socket status
+        with mock.patch.object(prox.ipc, "is_socket_ready", return_value=True):
+            mock_client = mock.MagicMock()
+            mock_client.__enter__.return_value = mock_client
+            with mock.patch.object(prox.ipc, "get_socket_client", return_value=mock_client):
+                res_det = prox.apply_detailed()
+                assert res_det.applied is True
+                assert res_det.status == ApplyStatus.SOCKET_CONFIRMED
+                assert bool(res_det) is True
+                assert prox.last_apply_result == res_det

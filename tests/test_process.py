@@ -46,14 +46,14 @@ def test_find_tool_binary() -> None:
     # Custom dir
     with mock.patch.object(Path, "is_file", return_value=True):
         res = ProcessController.find_tool_binary("ProxyChecker.exe", custom_dir=r"C:\Custom")
-        assert res == Path(r"C:\Custom\ProxyChecker.exe")
+        assert res == Path(r"C:\Custom") / "ProxyChecker.exe"
 
     # Found in Proxifier binary parent
     fake_prox = Path(r"C:\Program Files\Proxifier\Proxifier.exe")
     with mock.patch.object(ProcessController, "find_proxifier_binary", return_value=fake_prox):
         with mock.patch.object(Path, "is_file", side_effect=[True, True]):
             tool = ProcessController.find_tool_binary("ProxyChecker.exe")
-            assert tool == Path(r"C:\Program Files\Proxifier\ProxyChecker.exe")
+            assert tool == fake_prox.parent / "ProxyChecker.exe"
 
     # Not found anywhere
     with mock.patch.object(ProcessController, "find_proxifier_binary", return_value=Path(r"C:\None\Proxifier.exe")):
@@ -136,6 +136,55 @@ def test_silent_load() -> None:
         with mock.patch.object(Path, "is_file", return_value=True):
             with mock.patch("subprocess.Popen", return_value=mock_proc_timeout):
                 assert ProcessController.silent_load(fake_profile, executable=fake_exe) is True
+
+
+def test_load_profile_states() -> None:
+    fake_exe = Path(r"C:\Proxifier\Proxifier.exe")
+    fake_profile = Path(r"C:\Profiles\test.ppx")
+
+    with mock.patch.object(ProcessController, "find_proxifier_binary", return_value=fake_exe):
+        with mock.patch.object(Path, "is_file", return_value=True):
+            # 1. Command delivered to existing running instance (exit code 0)
+            proc_delivered = mock.MagicMock()
+            proc_delivered.wait.return_value = 0
+            proc_delivered.returncode = 0
+            with mock.patch("subprocess.Popen", return_value=proc_delivered) as mock_popen:
+                res1 = ProcessController.load_profile(fake_profile, executable=fake_exe, silent=False)
+                assert res1.success is True
+                assert res1.spawned_new_process is False
+                assert res1.returncode == 0
+                # When silent=False, "silent-load" must not be passed
+                cmd = mock_popen.call_args[0][0]
+                assert "silent-load" not in cmd
+
+            # 2. Main GUI process started (TimeoutExpired)
+            proc_spawned = mock.MagicMock()
+            proc_spawned.wait.side_effect = subprocess.TimeoutExpired(cmd=["test"], timeout=0.8)
+            with mock.patch("subprocess.Popen", return_value=proc_spawned):
+                res2 = ProcessController.load_profile(fake_profile, executable=fake_exe, silent=True)
+                assert res2.success is True
+                assert res2.spawned_new_process is True
+                assert res2.returncode is None
+
+            # 3. Failed command execution (exit code 1)
+            proc_failed = mock.MagicMock()
+            proc_failed.wait.return_value = 1
+            proc_failed.returncode = 1
+            with mock.patch("subprocess.Popen", return_value=proc_failed):
+                res3 = ProcessController.load_profile(fake_profile, executable=fake_exe)
+                assert res3.success is False
+                assert res3.spawned_new_process is False
+                assert res3.returncode == 1
+
+            # 4. TimeoutExpired but process terminated with error code
+            proc_crashed = mock.MagicMock()
+            proc_crashed.wait.side_effect = subprocess.TimeoutExpired(cmd=["test"], timeout=0.8)
+            proc_crashed.poll.return_value = 42
+            with mock.patch("subprocess.Popen", return_value=proc_crashed):
+                res4 = ProcessController.load_profile(fake_profile, executable=fake_exe)
+                assert res4.success is False
+                assert res4.spawned_new_process is False
+                assert res4.returncode == 42
 
 
 def test_kill() -> None:

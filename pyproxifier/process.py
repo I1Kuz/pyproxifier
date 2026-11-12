@@ -1,5 +1,6 @@
 """Process execution and lifecycle management for Proxifier.exe."""
 
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import subprocess
@@ -8,6 +9,16 @@ from typing import Any
 import psutil  # type: ignore[import-untyped]
 
 from pyproxifier.exceptions import ProxifierNotFoundError
+
+
+@dataclass
+class ProcessExecutionResult:
+    """Detailed result of executing Proxifier process command."""
+
+    success: bool
+    spawned_new_process: bool
+    returncode: int | None
+    message: str = ""
 
 
 class ProcessController:
@@ -133,16 +144,17 @@ class ProcessController:
         )
 
     @classmethod
-    def silent_load(
+    def load_profile(
         cls,
         profile_path: Path | str,
         executable: Path | str | None = None,
-    ) -> bool:
-        """Instructs Proxifier to load the profile silently.
+        silent: bool = True,
+        timeout: float = 0.8,
+    ) -> ProcessExecutionResult:
+        """Executes Proxifier with a profile, distinguishing process launch from command delivery.
 
-        If Proxifier is running, reloads into the active instance without prompting.
-        If Proxifier is not running, launches it with this profile.
-        Uses non-blocking Popen to prevent GUI handle deadlocks.
+        If Proxifier is running, the secondary process passes the profile via IPC and exits (rc=0).
+        If Proxifier is not running, it launches as the primary GUI process and stays active.
         """
         exe = cls.find_proxifier_binary(executable)
         if not exe.is_file():
@@ -152,17 +164,60 @@ class ProcessController:
         if not p_path.is_file():
             raise FileNotFoundError(f"Profile file does not exist: {p_path}")
 
+        cmd: list[str] = [str(exe), str(p_path)]
+        if silent:
+            cmd.append("silent-load")
+
         proc = subprocess.Popen(
-            [str(exe), str(p_path), "silent-load"],
+            cmd,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
         try:
-            proc.wait(timeout=0.8)
-            return proc.returncode == 0
+            proc.wait(timeout=timeout)
+            rc = proc.returncode
+            return ProcessExecutionResult(
+                success=rc == 0,
+                spawned_new_process=False,
+                returncode=rc,
+                message=f"Command delivered to existing instance (exit code {rc})." if rc == 0 else f"Process exited with error code {rc}."
+            )
         except subprocess.TimeoutExpired:
-            # When started as primary GUI process, Proxifier stays alive in background, which is expected
-            return True
+            poll_res = proc.poll()
+            if isinstance(poll_res, int) and poll_res != 0:
+                return ProcessExecutionResult(
+                    success=False,
+                    spawned_new_process=False,
+                    returncode=poll_res,
+                    message=f"Process terminated with error code {poll_res}.",
+                )
+            return ProcessExecutionResult(
+                success=True,
+                spawned_new_process=True,
+                returncode=poll_res if isinstance(poll_res, int) else None,
+                message="Proxifier launched as primary GUI process (running in background).",
+            )
+
+    @classmethod
+    def silent_load(
+        cls,
+        profile_path: Path | str,
+        executable: Path | str | None = None,
+        silent: bool = True,
+        timeout: float = 0.8,
+    ) -> bool:
+        """Instructs Proxifier to load the profile.
+
+        If Proxifier is running, reloads into the active instance without prompting.
+        If Proxifier is not running, launches it with this profile.
+        Uses non-blocking Popen to prevent GUI handle deadlocks.
+        """
+        return cls.load_profile(
+            profile_path,
+            executable=executable,
+            silent=silent,
+            timeout=timeout,
+        ).success
 
     @classmethod
     def kill(cls, timeout: float = 3.0) -> int:

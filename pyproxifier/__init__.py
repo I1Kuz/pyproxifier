@@ -39,9 +39,12 @@ from pyproxifier.models.options import (
 from pyproxifier.models.profile import ProxifierProfile
 from pyproxifier.models.proxy import ProxyItem, ProxyProtocol
 from pyproxifier.models.rule import ActionType, RuleItem
+from pyproxifier.models.xml_element import XMLElement
 from pyproxifier.parser import ProfileParser
 from pyproxifier.process import ProcessController
 from pyproxifier.ipc import (
+    ApplyResult,
+    ApplyStatus,
     ControlSocketClient,
     DriverIPC,
     IPCManager,
@@ -55,6 +58,8 @@ from pyproxifier.version import __version__
 
 __all__ = [
     "ActionType",
+    "ApplyResult",
+    "ApplyStatus",
     "ChainItem",
     "ChainNotFoundError",
     "ChainReferenceNotFoundError",
@@ -103,5 +108,6 @@ __all__ = [
     "ValidationError",
     "Validator",
     "WindowIPC",
+    "XMLElement",
     "__version__",
 ]

@@ -6,7 +6,7 @@ import subprocess
 
 from pyproxifier.checker import ProxyChecker, ProxyCheckResult
 from pyproxifier.exceptions import ProfileNotFoundError
-from pyproxifier.ipc import ControlSocketClient, IPCManager, ServiceIPC
+from pyproxifier.ipc import ApplyResult, ControlSocketClient, IPCManager, ServiceIPC
 from pyproxifier.managers.config_manager import ConfigManager
 from pyproxifier.managers.proxy_manager import ProxyManager
 from pyproxifier.managers.rule_manager import RuleManager
@@ -52,6 +52,7 @@ class Proxifier:
     ) -> None:
         self.executable: Path = ProcessController.find_proxifier_binary(executable)
         self.auto_save: bool = auto_save
+        self.last_apply_result: ApplyResult | None = None
         self.ipc: IPCManager = IPCManager(executable=self.executable)
 
         # Resolve active profile path via ConfigManager (Single Responsibility)
@@ -101,10 +102,15 @@ class Proxifier:
         self._sync_managers()
         return self._profile
 
-    def save(self, path: Path | str | None = None, validate: bool = True) -> Path:
-        """Saves the current active profile to disk."""
+    def save(
+        self,
+        path: Path | str | None = None,
+        validate: bool = True,
+        backup: bool = False,
+    ) -> Path:
+        """Saves the current active profile to disk with atomic write semantics."""
         target = Path(path) if path else self.profile_path
-        saved_path = ConfigManager.save(target, self._profile, validate=validate)
+        saved_path = ConfigManager.save(target, self._profile, validate=validate, backup=backup)
         self.profile_path = saved_path
         return saved_path
 
@@ -125,17 +131,39 @@ class Proxifier:
         Uses in-memory TCP Control Socket or native message IPC.
 
         If save_to_disk=True, also writes the configuration to the active profile file on disk.
+        If use_socket=False, bypasses TCP Control Socket mechanisms.
+        If silent=False, executes CLI loader without 'silent-load' argument.
         """
         self.validate()
         if save_to_disk or self.auto_save:
             self.save()
 
-        # If user explicitly requested socket or default auto
-        return self.ipc.apply_profile(
+        ok = self.ipc.apply_profile(
             self._profile,
             socket_port=socket_port,
+            use_socket=use_socket,
+            silent=silent,
             validate=False,
         )
+        self.last_apply_result = self.ipc.last_apply_result
+        return ok
+
+    def apply_detailed(
+        self,
+        silent: bool = True,
+        use_socket: bool | None = None,
+        socket_port: int | None = None,
+        save_to_disk: bool = False,
+    ) -> ApplyResult:
+        """Applies configuration and returns explicit ApplyResult status details."""
+        self.apply(
+            silent=silent,
+            use_socket=use_socket,
+            socket_port=socket_port,
+            save_to_disk=save_to_disk,
+        )
+        assert self.last_apply_result is not None
+        return self.last_apply_result
 
     def control_socket(
         self,

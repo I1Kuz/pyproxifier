@@ -471,6 +471,40 @@ def test_ipc_manager_apply_strategy_4_running_fallback_silent_load(
                     mock_silent.assert_called_once()
 
 
+def test_ipc_manager_apply_detailed_status_distinction(sample_profile: ProxifierProfile) -> None:
+    from pyproxifier.ipc.status import ApplyStatus
+
+    mgr = IPCManager()
+
+    # 1. When Proxifier was NOT running, strategy 4 reports PROCESS_SPAWNED
+    with patch.object(mgr, "is_socket_ready", return_value=False):
+        with patch.object(mgr, "is_proxifier_running", return_value=False):
+            with patch.object(mgr, "is_pipe_ready", return_value=False):
+                with patch("pyproxifier.process.ProcessController.silent_load", return_value=True):
+                    res = mgr.apply_profile_detailed(sample_profile, use_socket=False)
+                    assert res.applied is True
+                    assert res.status == ApplyStatus.PROCESS_SPAWNED
+
+    # 2. When Proxifier WAS running, strategy 4 reports COMMAND_DELIVERED
+    with patch.object(mgr, "is_socket_ready", return_value=False):
+        with patch.object(mgr, "is_proxifier_running", return_value=True):
+            with patch.object(mgr, "is_pipe_ready", return_value=False):
+                with patch("pyproxifier.process.ProcessController.silent_load", return_value=True):
+                    res2 = mgr.apply_profile_detailed(sample_profile, use_socket=False)
+                    assert res2.applied is True
+                    assert res2.status == ApplyStatus.COMMAND_DELIVERED
+
+    # 3. When silent_load fails, strategy 4 reports FAILED
+    with patch.object(mgr, "is_socket_ready", return_value=False):
+        with patch.object(mgr, "is_proxifier_running", return_value=True):
+            with patch.object(mgr, "is_pipe_ready", return_value=False):
+                with patch("pyproxifier.process.ProcessController.silent_load", return_value=False):
+                    res3 = mgr.apply_profile_detailed(sample_profile, use_socket=False)
+                    assert res3.applied is False
+                    assert res3.status == ApplyStatus.FAILED
+                    assert bool(res3) is False
+
+
 def test_ipc_manager_graceful_exit_via_socket() -> None:
     mgr = IPCManager()
     mock_client = MagicMock()
